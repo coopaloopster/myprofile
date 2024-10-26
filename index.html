@@ -39,12 +39,13 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        const boxSize = 20; // Size of each block
-        let snake = [{x: 200, y: 200}]; // Snake starts in the center
-        let direction = {x: 0, y: 0}; // Initial direction
-        let food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize}; // Random food position
+        const boxSize = 20;
+        let snake = [{x: 200, y: 200}];
+        let direction = {x: 0, y: 0};
+        let food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize};
         let score = 0;
-        let snakeColor = getRandomColor(); // Initial color for the snake
+        let snakeColor = getRandomColor();
+        let bullet = null; // Variable to store bullet position and direction
 
         function getRandomColor() {
             const letters = '0123456789ABCDEF';
@@ -70,24 +71,23 @@
         }
 
         function drawSnake() {
-            // Draw the head as a triangle
             const head = snake[0];
             ctx.fillStyle = snakeColor;
             ctx.beginPath();
 
-            if (direction.x === 1) { // Moving right
+            if (direction.x === 1) {
                 ctx.moveTo(head.x, head.y);
                 ctx.lineTo(head.x + boxSize, head.y + boxSize / 2);
                 ctx.lineTo(head.x, head.y + boxSize);
-            } else if (direction.x === -1) { // Moving left
+            } else if (direction.x === -1) {
                 ctx.moveTo(head.x + boxSize, head.y);
                 ctx.lineTo(head.x, head.y + boxSize / 2);
                 ctx.lineTo(head.x + boxSize, head.y + boxSize);
-            } else if (direction.y === 1) { // Moving down
+            } else if (direction.y === 1) {
                 ctx.moveTo(head.x, head.y);
                 ctx.lineTo(head.x + boxSize / 2, head.y + boxSize);
                 ctx.lineTo(head.x + boxSize, head.y);
-            } else if (direction.y === -1) { // Moving up
+            } else if (direction.y === -1) {
                 ctx.moveTo(head.x, head.y + boxSize);
                 ctx.lineTo(head.x + boxSize / 2, head.y);
                 ctx.lineTo(head.x + boxSize, head.y + boxSize);
@@ -96,7 +96,6 @@
             ctx.closePath();
             ctx.fill();
 
-            // Draw the rest of the snake with rounded rectangles
             for (let i = 1; i < snake.length; i++) {
                 drawRoundedBox(snake[i].x, snake[i].y, snakeColor);
             }
@@ -110,52 +109,81 @@
 
             snake.unshift(newHead);
 
-            // If the snake eats the food
             if (newHead.x === food.x && newHead.y === food.y) {
                 score++;
-                food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize}; // Place new food
+                food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize};
             } else {
-                snake.pop(); // Remove tail if no food is eaten
+                snake.pop();
             }
         }
 
         function checkCollision() {
             const head = snake[0];
-
-            // Check wall collisions
             if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
                 return true;
             }
-
-            // Check self-collision
             for (let i = 1; i < snake.length; i++) {
                 if (head.x === snake[i].x && head.y === snake[i].y) {
                     return true;
                 }
             }
-
             return false;
         }
 
         function drawFood() {
-            drawBox(food.x, food.y, '#FFD700'); // Bright yellow color for food
+            drawBox(food.x, food.y, '#FFD700');
+        }
+
+        function shootBullet() {
+            if (!bullet && (direction.x !== 0 || direction.y !== 0)) {
+                bullet = {
+                    x: snake[0].x + direction.x * boxSize,
+                    y: snake[0].y + direction.y * boxSize,
+                    direction: { ...direction }
+                };
+            }
+        }
+
+        function moveBullet() {
+            if (bullet) {
+                bullet.x += bullet.direction.x * boxSize;
+                bullet.y += bullet.direction.y * boxSize;
+
+                // Check if bullet hits the food
+                if (bullet.x === food.x && bullet.y === food.y) {
+                    score++;
+                    food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize};
+                    bullet = null;
+                }
+
+                // Remove bullet if it goes off the canvas
+                if (bullet.x < 0 || bullet.x >= canvas.width || bullet.y < 0 || bullet.y >= canvas.height) {
+                    bullet = null;
+                }
+            }
+        }
+
+        function drawBullet() {
+            if (bullet) {
+                drawBox(bullet.x, bullet.y, '#0000FF'); // Blue color for bullet
+            }
         }
 
         function updateGame() {
             if (checkCollision()) {
                 alert('Game Over! Your score: ' + score);
-                snake = [{x: 200, y: 200}]; // Reset the snake
-                direction = {x: 0, y: 0}; // Reset direction
-                score = 0; // Reset score
+                snake = [{x: 200, y: 200}];
+                direction = {x: 0, y: 0};
+                score = 0;
+                bullet = null;
             }
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
-            drawFood(); // Draw food
-            moveSnake(); // Move snake
-
-            // Generate a new color for the snake each frame update
-            snakeColor = getRandomColor();
-            drawSnake(); // Draw snake with the new color
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawFood();
+            moveSnake();
+            moveBullet();
+            drawSnake();
+            drawBullet();
         }
 
         document.addEventListener('keydown', function(event) {
@@ -167,10 +195,12 @@
                 direction = {x: -1, y: 0};
             } else if (event.key === 'ArrowRight' && direction.x === 0) {
                 direction = {x: 1, y: 0};
+            } else if (event.key === ' ') { // Spacebar to shoot
+                shootBullet();
             }
         });
 
-        setInterval(updateGame, 100); // Update game every 100 milliseconds
+        setInterval(updateGame, 100);
     </script>
 </body>
 </html>
