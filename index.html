@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake Game</title>
+    <title>Snake Game with Exploding Bullets</title>
     <style>
         body {
             display: flex;
@@ -31,7 +31,7 @@
 </head>
 <body>
     <div class="game-container">
-        <h1>Snake Game</h1>
+        <h1>Snake Game with Exploding Bullets</h1>
         <canvas id="gameCanvas" width="400" height="400"></canvas>
     </div>
 
@@ -45,7 +45,11 @@
         let food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize};
         let score = 0;
         let snakeColor = getRandomColor();
-        let bullet = null; // Variable to store bullet position and direction
+        let bullet = null;
+        let bulletCount = 0;
+        let obstacles = [];
+        let isExploding = false; // Track if an explosion is happening
+        let explosionFlashCount = 0; // Count flashes during explosion
 
         function getRandomColor() {
             const letters = '0123456789ABCDEF';
@@ -112,6 +116,16 @@
             if (newHead.x === food.x && newHead.y === food.y) {
                 score++;
                 food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize};
+
+                // Generate a new food position
+                while (obstacles.some(obstacle => obstacle.x === food.x && obstacle.y === food.y) || snake.some(segment => segment.x === food.x && segment.y === food.y)) {
+                    food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize};
+                }
+
+                obstacles.push({
+                    x: Math.floor(Math.random() * 20) * boxSize,
+                    y: Math.floor(Math.random() * 20) * boxSize
+                });
             } else {
                 snake.pop();
             }
@@ -119,14 +133,23 @@
 
         function checkCollision() {
             const head = snake[0];
+
             if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
                 return true;
             }
+
             for (let i = 1; i < snake.length; i++) {
                 if (head.x === snake[i].x && head.y === snake[i].y) {
                     return true;
                 }
             }
+
+            for (let obstacle of obstacles) {
+                if (head.x === obstacle.x && head.y === obstacle.y) {
+                    return true;
+                }
+            }
+
             return false;
         }
 
@@ -134,13 +157,49 @@
             drawBox(food.x, food.y, '#FFD700');
         }
 
+        function drawObstacles() {
+            for (let obstacle of obstacles) {
+                drawBox(obstacle.x, obstacle.y, '#8B0000');
+            }
+        }
+
         function shootBullet() {
             if (!bullet && (direction.x !== 0 || direction.y !== 0)) {
+                bulletCount++;
                 bullet = {
                     x: snake[0].x + direction.x * boxSize,
                     y: snake[0].y + direction.y * boxSize,
-                    direction: { ...direction }
+                    direction: { ...direction },
+                    isGreen: bulletCount % 3 === 0
                 };
+            }
+        }
+
+        function explodeBullet() {
+            if (bullet && bullet.isGreen) {
+                isExploding = true;
+                explosionFlashCount = 5; // Number of flashes during explosion
+
+                // Remove half of the obstacles
+                obstacles = obstacles.slice(0, Math.ceil(obstacles.length / 2));
+
+                // Eat food in a smaller area around the bullet
+                for (let i = -1; i <= 1; i++) {
+                    for (let j = -1; j <= 1; j++) {
+                        const areaFoodX = bullet.x + i * boxSize;
+                        const areaFoodY = bullet.y + j * boxSize;
+                        if (areaFoodX === food.x && areaFoodY === food.y) {
+                            food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize};
+
+                            // Generate a new food position
+                            while (obstacles.some(obstacle => obstacle.x === food.x && obstacle.y === food.y) || snake.some(segment => segment.x === food.x && segment.y === food.y)) {
+                                food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize};
+                            }
+                        }
+                    }
+                }
+
+                bullet = null; // Remove the bullet after explosion
             }
         }
 
@@ -149,23 +208,19 @@
                 bullet.x += bullet.direction.x * boxSize;
                 bullet.y += bullet.direction.y * boxSize;
 
-                // Check if bullet hits the food
-                if (bullet.x === food.x && bullet.y === food.y) {
-                    score++;
-                    food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize};
-                    bullet = null;
-                }
-
-                // Remove bullet if it goes off the canvas
                 if (bullet.x < 0 || bullet.x >= canvas.width || bullet.y < 0 || bullet.y >= canvas.height) {
                     bullet = null;
+                } else {
+                    // Check if bullet hits an obstacle
+                    obstacles = obstacles.filter(obstacle => !(bullet.x === obstacle.x && bullet.y === obstacle.y));
                 }
             }
         }
 
         function drawBullet() {
             if (bullet) {
-                drawBox(bullet.x, bullet.y, '#0000FF'); // Blue color for bullet
+                const color = bullet.isGreen ? '#00FF00' : '#0000FF';
+                drawBox(bullet.x, bullet.y, color);
             }
         }
 
@@ -176,13 +231,26 @@
                 direction = {x: 0, y: 0};
                 score = 0;
                 bullet = null;
+                obstacles = [];
+                bulletCount = 0; // Reset bullet count
             }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Flash colors during explosion
+            if (isExploding && explosionFlashCount > 0) {
+                ctx.fillStyle = getRandomColor();
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                explosionFlashCount--;
+            } else if (explosionFlashCount === 0) {
+                isExploding = false;
+            }
+
             drawFood();
+            drawObstacles();
             moveSnake();
-            moveBullet();
             drawSnake();
+            moveBullet();
             drawBullet();
         }
 
@@ -195,8 +263,12 @@
                 direction = {x: -1, y: 0};
             } else if (event.key === 'ArrowRight' && direction.x === 0) {
                 direction = {x: 1, y: 0};
-            } else if (event.key === ' ') { // Spacebar to shoot
-                shootBullet();
+            } else if (event.key === ' ' && bullet) {
+                if (bullet.isGreen) {
+                    explodeBullet(); // Explode green bullet
+                }
+            } else if (event.key === ' ') {
+                shootBullet(); // Shoot normal bullet
             }
         });
 
