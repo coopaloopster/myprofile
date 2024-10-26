@@ -44,15 +44,61 @@
         let direction = {x: 0, y: 0}; // Initial direction
         let food = {x: Math.floor(Math.random() * 20) * boxSize, y: Math.floor(Math.random() * 20) * boxSize}; // Random food position
         let score = 0;
+        let snakeColor = getRandomColor(); // Initial color for the snake
+
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
 
         function drawBox(x, y, color) {
             ctx.fillStyle = color;
             ctx.fillRect(x, y, boxSize, boxSize);
         }
 
+        function drawRoundedBox(x, y, color) {
+            ctx.fillStyle = color;
+            ctx.lineJoin = "round";
+            ctx.lineWidth = boxSize / 2;
+            ctx.strokeStyle = color;
+            ctx.strokeRect(x + boxSize / 4, y + boxSize / 4, boxSize / 2, boxSize / 2);
+            ctx.fillRect(x + boxSize / 4, y + boxSize / 4, boxSize / 2, boxSize / 2);
+        }
+
         function drawSnake() {
-            for (let i = 0; i < snake.length; i++) {
-                drawBox(snake[i].x, snake[i].y, '#00FF00');
+            // Draw the head as a triangle
+            const head = snake[0];
+            ctx.fillStyle = snakeColor;
+            ctx.beginPath();
+
+            if (direction.x === 1) { // Moving right
+                ctx.moveTo(head.x, head.y);
+                ctx.lineTo(head.x + boxSize, head.y + boxSize / 2);
+                ctx.lineTo(head.x, head.y + boxSize);
+            } else if (direction.x === -1) { // Moving left
+                ctx.moveTo(head.x + boxSize, head.y);
+                ctx.lineTo(head.x, head.y + boxSize / 2);
+                ctx.lineTo(head.x + boxSize, head.y + boxSize);
+            } else if (direction.y === 1) { // Moving down
+                ctx.moveTo(head.x, head.y);
+                ctx.lineTo(head.x + boxSize / 2, head.y + boxSize);
+                ctx.lineTo(head.x + boxSize, head.y);
+            } else if (direction.y === -1) { // Moving up
+                ctx.moveTo(head.x, head.y + boxSize);
+                ctx.lineTo(head.x + boxSize / 2, head.y);
+                ctx.lineTo(head.x + boxSize, head.y + boxSize);
+            }
+
+            ctx.closePath();
+            ctx.fill();
+
+            // Draw the rest of the snake with rounded rectangles
+            for (let i = 1; i < snake.length; i++) {
+                drawRoundedBox(snake[i].x, snake[i].y, snakeColor);
             }
         }
 
@@ -92,7 +138,7 @@
         }
 
         function drawFood() {
-            drawBox(food.x, food.y, '#FF0000');
+            drawBox(food.x, food.y, '#FFD700'); // Bright yellow color for food
         }
 
         function updateGame() {
@@ -106,7 +152,10 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
             drawFood(); // Draw food
             moveSnake(); // Move snake
-            drawSnake(); // Draw snake
+
+            // Generate a new color for the snake each frame update
+            snakeColor = getRandomColor();
+            drawSnake(); // Draw snake with the new color
         }
 
         document.addEventListener('keydown', function(event) {
